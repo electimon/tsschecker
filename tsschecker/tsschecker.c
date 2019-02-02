@@ -19,10 +19,12 @@
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
-#include "tsschecker.h"
-#include "download.h"
+
 #include <libfragmentzip/libfragmentzip.h>
 #include <libirecovery.h>
+
+#include "tsschecker.h"
+#include "download.h"
 #include "tss.h"
 
 #ifdef __APPLE__
@@ -96,7 +98,6 @@ static const char *win_path_get(enum paths path){
 
 #include <sys/stat.h>
 #define __mkdir(path, mode) mkdir(path, mode)
-
 #endif
 
 /* getJson functions */
@@ -107,7 +108,7 @@ int nocache = 0;
 int save_shshblobs = 0;
 const char *shshSavePath = "."DIRECTORY_DELIMITER_STR;
 
-/* iPhone & iPod touch (1st generations) doesn't have signing technology. */
+/* NOTE: iPhone & iPod touch (1st generations) doesn't have signing technology. */
 static struct bbdevice bbdevices[] = {
     // iPod touches
     {"iPod2,1", 0, 0}, // 2nd gen
@@ -204,12 +205,21 @@ static struct bbdevice bbdevices[] = {
     {"iPad8,7", 165673526, 12}, // iPad Pro 12,9", 3rd gen, Cellular)
     {"iPad8,8", 165673526, 12}, // iPad Pro 12,9", 3rd gen, 1 TB model, Cellular)
     
+    // Apple Watches
+    /* Models here are produced with Cellular.
+       Apple Watch Series (0,1,2) doesn't have Cellular network, bbgcids not required. */
+    {"Watch3,3", 0, 0}, // Apple Watch Series 3 (38mm)
+    {"Watch3,4", 0, 0}, // Apple Watch Series 3 (42mm)
+    {"Watch4,1", 0, 0}, // Apple Watch Series 4 (40mm)
+    {"Watch4,2", 0, 0}, // Apple Watch Series 4 (44mm)
+    
     // Apple TVs
     {"AppleTV1,1", 0, 0}, // 1st gen
     {"AppleTV2,1", 0, 0}, // 2nd gen
     {"AppleTV3,1", 0, 0}, // 3rd gen
     {"AppleTV3,2", 0, 0}, // 3rd gen (2013)
     {"AppleTV5,3", 0, 0}, // 4th gen
+    {"AppleTV6,2", 0, 0}, // 4K
     {NULL, 0, 0}
 };
 
@@ -283,10 +293,8 @@ const char *getModelFromBoardconfig(const char *boardconfig){
             }else
                 rt = table->product_type;
         }
-        
         table++;
     }
-    
     return rt;
 }
 
@@ -313,9 +321,9 @@ plist_t getBuildidentityWithBoardconfig(plist_t buildManifest, const char *board
         }
         char *string = NULL;
         plist_get_string_val(RestoreBehavior, &string);
-        //assuming there are only Erase and Update. If it's not Erase it must be Update also converting isUpdateInstall to bool (1 or 0)
+        // assuming there are only Erase and Update. If it's not Erase it must be Update also converting isUpdateInstall to bool (1 or 0)
         if ((strncmp(string, "Erase", strlen(string)) != 0) == !isUpdateInstall){
-            //continue when Erase found but isUpdateInstall is true or Update found and isUpdateInstall is false
+            // continue when Erase found but isUpdateInstall is true or Update found and isUpdateInstall is false
             rt = NULL;
             continue;
         }
@@ -343,7 +351,6 @@ plist_t getBuildidentity(plist_t buildManifest, const char *model, int isUpdateI
     const char *boardconfig = getBoardconfigFromModel(model);
     if (!boardconfig)
         reterror("[TSSR] can't find boardconfig for device=%s please use --boardconfig\n",model);
-    
     rt = getBuildidentityWithBoardconfig(buildManifest, boardconfig, isUpdateInstall);
     
 error:
@@ -353,7 +360,6 @@ error:
 
 /* json functions */
 long parseTokens(const char *json, jssytok_t **tokens){
-    
     log("[JSON] counting elements\n");
     long tokensCnt = jssy_parse(json, strlen(json), NULL, 0);
     *tokens = (jssytok_t*)malloc(sizeof(jssytok_t) * tokensCnt);
@@ -363,7 +369,7 @@ long parseTokens(const char *json, jssytok_t **tokens){
 }
 
 /* get functions (again) */
-//returns NULL terminated array of t_versionURL objects
+// returns NULL terminated array of t_versionURL objects
 t_versionURL *getFirmwareUrls(const char *deviceModel, t_iosVersion *versVals, jssytok_t *tokens){
     t_versionURL *rets = NULL;
     const t_versionURL *rets_base = NULL;
@@ -407,7 +413,7 @@ malloc_rets:
             else{
                 for (int i=0; rets_base[i].buildID; i++) {
                     if (strncmp(rets_base[i].buildID, i_build->value, i_build->size) == 0){
-                        info("[TSSC] Marking duplicated Build ID %s\n",rets_base[i].buildID);
+                        info("[TSSC] Marking duplicated build ID %s\n",rets_base[i].buildID);
                         rets->isDupulicate = 1;
                         break;
                     }
@@ -496,7 +502,8 @@ char *getBuildManifest(char *url, const char *device, const char *version, const
     if (!url) {
         if (!f || nocache) return NULL;
         info("[TSSC] using cached Buildmanifest for %s\n",name);
-    }else info("[TSSC] opening Buildmanifest for %s\n",name);
+    }else
+        info("[TSSC] opening Buildmanifest for %s\n",name);
     
     if (!f || nocache){
         //download if it isn't there
@@ -542,7 +549,6 @@ void getRandNum(char *dst, size_t size, int base){
 
 /* TSS functions */
 int tss_populate_devicevals(plist_t tssreq, uint64_t ecid, char *nonce, size_t nonce_size, char *sep_nonce, size_t sep_nonce_size, int image4supported){
-    
     plist_dict_set_item(tssreq, "ApECID", plist_new_uint(ecid));
     if (nonce) {
         plist_dict_set_item(tssreq, "ApNonce", plist_new_data(nonce, nonce_size));
@@ -846,7 +852,7 @@ int isManifestBufSignedForDevice(char *buildManifestBuffer, t_devicevals *devVal
     if (isSigned && save_shshblobs){
         if (!devVals->installType){
             plist_t tssreq2 = NULL;
-            info("also requesting APTicket for installType=Update\n");
+            info("also requesting update APTicket\n");
             devVals->installType = kInstallTypeUpdate;
             if (tssrequest(&tssreq2, buildManifestBuffer, devVals, basebandMode)){
                 warning("[TSSR] failed to build TSS request for alternative installType\n");
@@ -856,8 +862,7 @@ int isManifestBufSignedForDevice(char *buildManifestBuffer, t_devicevals *devVal
             }
             if (tssreq2) plist_free(tssreq2);
             devVals->installType = kInstallTypeDefault;
-        }
-        {
+        }   {
             plist_t tssreq2 = NULL;
             char *apnonce = devVals->apnonce;
             size_t apnonceLen = devVals->parsedApnonceLen;
@@ -1009,7 +1014,7 @@ int isVersionSignedForDevice(jssytok_t *firmwareTokens, t_iosVersion *versVals, 
 #define reterror(a ... ) {error(a); goto error;}
     int nocacheorig = nocache;
     if (versVals->version && atoi(versVals->version) <= 3) {
-        /* Signing tickets technology available with iPhone OS 3.0 only for iPhone 3Gs. Other devices have signing technology since iOS 4.
+        /* NOTE: Signing tickets technology available with iPhone OS 3.0 only for iPhone 3Gs. Other devices have signing technology since iOS 4.
            So, iPhone and iPod touch (1st generations) doesn't have signing technology for all firmwares; iPhone 3G and iPod touch (2nd generation) have it only for iOS 4.0-4.2.1. */
         info("[TSSC] version to check \"%s\" seems to be iOS 3 or lower, which did not require SHSH or APTicket.\n\tSkipping checks and returning true.\n",versVals->version);
         return 1;
@@ -1153,7 +1158,6 @@ char **getListOfiOSForDevice(jssytok_t *tokens, const char *device, int isOTA, i
     
     jssytok_t *tmp = firmwares->subval;
     for (int i=0; i<firmwares->size; tmp = tmp->next,i++) {
-        
         jssytok_t *ios = jssy_dictGetValueForKey(tmp, "version");
         
         int isBeta = 0;
