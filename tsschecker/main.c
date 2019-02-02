@@ -22,15 +22,16 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+
 #include "download.h"
 #include "tsschecker.h"
 #include "all.h"
 #include "debug.h"
 
-#define FLAG_LIST_IOS       1 << 0
-#define FLAG_LIST_DEVICES   1 << 1
-#define FLAG_BUILDMANIFEST  1 << 2
-#define FLAG_LATEST_IOS     1 << 3
+#define FLAG_LIST_IOS       (1 << 0)
+#define FLAG_LIST_DEVICES   (1 << 1)
+#define FLAG_BUILDMANIFEST  (1 << 2)
+#define FLAG_LATEST_IOS     (1 << 3)
 
 int idevicerestore_debug;
 #define reterror(code,a ...) {error(a); err = code; goto error;}
@@ -67,11 +68,11 @@ static struct option longopts[] = {
 void cmd_help(){
     printf("Usage: tsschecker [OPTIONS]\n");
     printf("Works with signing technology on iOS devices\n\n");
+    printf("  -h, --help\t\t\tprints usage information\n");
     printf("  -d, --device MODEL\t\tspecific device by its MODEL (eg. iPhone11,8)\n");
     printf("  -i, --ios VERSION\t\tspecific iOS version (eg. 12.1.3)\n");
     printf("      --buildid BUILDID\t\tspecific buildid instead of iOS version (eg. 16D40)\n");
     printf("  -B, --boardconfig BOARD\tspecific boardconfig instead of iPhone model (eg. n841ap)\n");
-    printf("  -h, --help\t\t\tprints usage information\n");
     printf("  -o, --ota\t\t\tcheck OTA signing status, instead of normal restore\n");
     printf("  -b, --no-baseband\t\tdon't check baseband signing status. Request a ticket without baseband\n");
     printf("  -m, --build-manifest\t\tmanually specify BuildManifest (can be used with -d)\n");
@@ -86,7 +87,6 @@ void cmd_help(){
     printf("      --bbsnum SNUM\t\tmanually specify BbSNUM, in hex, for saving valid BBTicket\n");
     printf("      --save-path PATH\t\tspecify path for saving blobs\n");
     printf("      --generator GEN\t\tmanually specify generator in format 0x%%16llx\n");
-    printf("  -h, --help\t\t\tprints usage information\n");
     printf("      --beta\t\t\trequest signing tickets for beta instead of normal release (use with -o)\n");
     printf("      --list-devices\t\tlist all known devices\n");
     printf("      --list-ios\t\tlist all known iOS versions\n");
@@ -94,8 +94,8 @@ void cmd_help(){
     printf("      --print-tss-request\n");
     printf("      --print-tss-response\n");
     printf("      --raw\t\t\tsend raw file to Apple's TSS server (useful for debugging)\n\n");
-    printf("Homepage: <https://github.com/s0uthwest/tsschecker>\n");
-    printf("Original project: <https://github.com/tihmstar/tsschecker>\n");
+    printf("Homepage: https://github.com/s0uthwest/tsschecker\n");
+    printf("Original project: https://github.com/tihmstar/tsschecker\n");
 }
 
 int64_t parseECID(const char *ecid){
@@ -201,7 +201,7 @@ int main(int argc, const char * argv[]) {
             case 'e': // long option: "ecid"; can be called as short option
                 ecid = optarg;
                 break;
-            case 'g': // long option: "ecid"; can be called as short option
+            case 'g': // long option: "generator"; can be called as short option
                 if (optarg[0] != '0' && optarg[1] != 'x')
                     goto failparse;
                 devVals.generator[0] = '0';
@@ -278,7 +278,7 @@ int main(int argc, const char * argv[]) {
                 rawFilePath = optarg;
                 idevicerestore_debug = 1;
                 break;
-            case 11: // --bbsnum
+            case 11: // only long option: "bbsnum"
                 bbsnum = optarg;
                 break;
             default:
@@ -300,10 +300,10 @@ int main(int argc, const char * argv[]) {
         fread(buf, 1, bufSize, f);
         fclose(f);
         
-        printf("Sending TSS Request:\n%s",buf);
+        printf("Sending TSS request:\n%s",buf);
         
         char *rsp = tss_request_send_raw(buf, NULL, (int*)&bufSize);
-        printf("TSS Server Returned:\n%s\n",rsp);
+        printf("TSS server returned:\n%s\n",rsp);
         free(rsp);
         return 0;
     }
@@ -440,7 +440,7 @@ int main(int argc, const char * argv[]) {
         if (isSigned >=0) printf("\n%s %s for device %s %s being signed!\n",(versVals.buildID) ? "Build" : "iOS" ,(versVals.buildID ? versVals.buildID : versVals.version),devVals.deviceModel, (isSigned) ? "IS" : "IS NOT");
         else{
             putchar('\n');
-            reterror(-69, "[TSSC] checking tss status failed!\n");
+            reterror(-69, "[TSSC] checking TSS status failed!\n");
         }
     }
     
